@@ -14,7 +14,7 @@ export default function NotFound() {
           <Link
             href="/"
             data-cursor="hover"
-            className="inline-block mt-8 text-[var(--color-blue-soft)] hover:text-[var(--color-bone)]"
+            className="inline-block mt-8 text-[var(--color-accent-soft)] hover:text-[var(--color-bone)]"
           >
             ← Back home
           </Link>

@@ -38,12 +38,12 @@ export default function Scene() {
         <directionalLight
           position={[3, 4, 5]}
           intensity={0.9}
-          color="#6c8cff"
+          color="#ffffff"
         />
         <directionalLight
           position={[-4, -2, -3]}
           intensity={0.3}
-          color="#3b6dff"
+          color="#cfcfd6"
         />
 
         <Particles />

@@ -30,7 +30,7 @@ export default function Hero({ active, onChange }: Props) {
                 className={[
                   "px-4 py-1.5 rounded-full text-sm transition-colors",
                   isActive
-                    ? "bg-[var(--color-blue)] text-white"
+                    ? "bg-[var(--color-accent)] text-[var(--color-ink)]"
                     : "bg-[var(--color-ink-soft)] text-[var(--color-bone-dim)] hover:text-[var(--color-bone)]",
                 ].join(" ")}
               >

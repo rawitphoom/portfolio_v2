@@ -84,7 +84,7 @@ export default async function ProjectPage({
           <Link
             href="/#projects"
             data-cursor="hover"
-            className="inline-flex items-center gap-2 mt-16 text-sm text-[var(--color-blue-soft)] hover:text-[var(--color-bone)] transition-colors"
+            className="inline-flex items-center gap-2 mt-16 text-sm text-[var(--color-accent-soft)] hover:text-[var(--color-bone)] transition-colors"
           >
             ← All projects
           </Link>
