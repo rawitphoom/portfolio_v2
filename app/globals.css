@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  /* black & blue palette */
+  --color-ink: #06060a;          /* near-black background */
+  --color-ink-soft: #0e1020;     /* slightly lifted panel */
+  --color-bone: #e8e8ee;         /* off-white text */
+  --color-bone-dim: #8a8aa0;     /* muted text */
+  --color-blue: #3b6dff;         /* electric accent */
+  --color-blue-soft: #6c8cff;    /* hover/light accent */
+  --color-blue-deep: #0b1a5c;    /* deep shadow tint */
+
+  --font-display: "Inter", system-ui, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-ink);
+  color: var(--color-bone);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page transition — triggered via template.tsx on every route change. */
+.page-enter {
+  animation: page-enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter {
+    animation: none;
+  }
+}
+
+/* Hide native cursor only on fine-pointer devices — we render our own. */
+@media (pointer: fine) {
+  html,
+  body,
+  * {
+    cursor: none !important;
+  }
+}
+
+/* The WebGL scene renders the backdrop now; body stays transparent so the
+   canvas shows through. */
+body {
+  background: transparent;
+}
