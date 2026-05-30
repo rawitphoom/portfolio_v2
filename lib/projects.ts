@@ -4,53 +4,61 @@ export type Project = {
   slug: string;
   title: string;
   subtitle: string;
+  /** SFU course this project was built for */
+  course: string;
   tags: ProjectTag[];
-  /** placeholder gradient — replaced later with real cover image/video */
-  cover: { from: string; to: string };
+  /** path to the cover image, served from /public */
+  cover: string;
 };
 
 export const PROJECTS: Project[] = [
   {
-    slug: "symphony-of-vines",
-    title: "The Symphony Of Vines",
-    subtitle: "Interactive Cinematic Experience",
+    slug: "mixtape",
+    title: "Mixtape",
+    subtitle: "Full-Stack Music App",
+    course: "IAT459 — Internet Computing",
     tags: ["Digital", "Experiment"],
-    cover: { from: "#0b1a5c", to: "#06060a" },
+    cover: "/projects/mixtape/cover.png",
   },
   {
-    slug: "klook",
-    title: "Klook",
-    subtitle: "Interactive Quiz",
-    tags: ["Digital", "Motion"],
-    cover: { from: "#3b6dff", to: "#0b1a5c" },
-  },
-  {
-    slug: "rspca-animal-futures",
-    title: "RSPCA Animal Futures",
-    subtitle: "Interactive Learning Experience",
+    slug: "consistency",
+    title: "Consistency",
+    subtitle: "Habit-Tracking Mobile App",
+    course: "IAT359 — Mobile Computing",
     tags: ["Digital"],
-    cover: { from: "#6c8cff", to: "#0b1a5c" },
+    cover: "/projects/consistency/cover.png",
   },
   {
-    slug: "blueyard",
-    title: "BlueYard",
-    subtitle: "Portfolio website",
-    tags: ["Digital", "Branding"],
-    cover: { from: "#0e1020", to: "#3b6dff" },
+    slug: "nextstep",
+    title: "NextStep",
+    subtitle: "Job App for International Students",
+    course: "IAT334 — Interface Design",
+    tags: ["Digital"],
+    cover: "/projects/nextstep/cover.png",
   },
   {
-    slug: "conor",
-    title: "Conor",
-    subtitle: "Brand Identity",
-    tags: ["Branding"],
-    cover: { from: "#06060a", to: "#3b6dff" },
+    slug: "whimsy-bites",
+    title: "Whimsy Bites",
+    subtitle: "Dessert Brand Website",
+    course: "IAT339 — Web Design & Development",
+    tags: ["Branding", "Digital"],
+    cover: "/projects/whimsy-bites/cover.png",
   },
   {
-    slug: "twenty-five",
-    title: "Twenty Five",
-    subtitle: "Mobile Product",
-    tags: ["Digital", "Motion"],
-    cover: { from: "#3b6dff", to: "#06060a" },
+    slug: "mage-in-the-maze",
+    title: "Mage in the Maze",
+    subtitle: "Tile-Based Maze Game",
+    course: "IAT167 — Digital Games",
+    tags: ["Digital", "Experiment"],
+    cover: "/projects/mage-in-the-maze/cover.png",
+  },
+  {
+    slug: "small-but-mighty",
+    title: "Small but Mighty",
+    subtitle: "Narrative 3D Animation",
+    course: "IAT343 — Animation",
+    tags: ["Motion"],
+    cover: "/projects/small-but-mighty/cover.png",
   },
 ];
 

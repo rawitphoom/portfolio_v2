@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { PROJECTS } from "@/lib/projects";
 import Nav from "@/components/Nav";
 
@@ -35,14 +36,18 @@ export default async function ProjectPage({
       <Nav />
 
       <main className="min-h-screen pt-32 pb-24">
-        {/* hero cover — placeholder gradient, swap for real media later */}
+        {/* hero cover — full case study comes later */}
         <section className="mx-auto max-w-6xl px-6">
-          <div
-            className="aspect-[16/8] w-full rounded-xl ring-1 ring-white/5 overflow-hidden"
-            style={{
-              backgroundImage: `linear-gradient(135deg, ${project.cover.from}, ${project.cover.to})`,
-            }}
-          />
+          <div className="relative aspect-[16/8] w-full rounded-xl ring-1 ring-white/5 overflow-hidden bg-[var(--color-ink-soft)]">
+            <Image
+              src={project.cover}
+              alt={project.title}
+              fill
+              sizes="(min-width: 1152px) 1152px, 100vw"
+              priority
+              className="object-cover"
+            />
+          </div>
         </section>
 
         <section className="mx-auto max-w-3xl px-6 mt-16">
