@@ -82,7 +82,7 @@ export default async function ProjectPage({
           </div>
 
           <Link
-            href="/#projects"
+            href="/projects"
             data-cursor="hover"
             className="inline-flex items-center gap-2 mt-16 text-sm text-[var(--color-accent-soft)] hover:text-[var(--color-bone)] transition-colors"
           >

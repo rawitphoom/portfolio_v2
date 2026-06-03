@@ -15,6 +15,10 @@ export const pointerState = {
   activity: 0,
   /** false until the pointer first moves, so butterflies don't rush to (0,0). */
   engaged: false,
+  /** NDC of the last click + a one-shot flag the scene consumes for a big burst. */
+  clickX: 0,
+  clickY: 0,
+  clickPending: false,
 };
 
 if (typeof window !== "undefined") {
@@ -36,6 +40,17 @@ if (typeof window !== "undefined") {
       inited = true;
       pointerState.ndcX = nx;
       pointerState.ndcY = ny;
+      pointerState.engaged = true;
+    },
+    { passive: true }
+  );
+
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      pointerState.clickX = (e.clientX / window.innerWidth) * 2 - 1;
+      pointerState.clickY = -((e.clientY / window.innerHeight) * 2 - 1);
+      pointerState.clickPending = true;
       pointerState.engaged = true;
     },
     { passive: true }

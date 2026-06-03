@@ -8,15 +8,28 @@
  */
 
 import { useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { EffectComposer } from "@react-three/postprocessing";
 import Particles from "./Particles";
 import { WaterEffect } from "./WaterEffect";
+import { pointerState } from "@/lib/pointerState";
 
 function Water() {
   // Create the Effect instance once — it owns its own uniforms.
   const effect = useMemo(() => new WaterEffect(), []);
   return <primitive object={effect} />;
+}
+
+// Gently glide the camera with the mouse so the whole scene parallaxes.
+function CameraRig() {
+  useFrame((state) => {
+    const tx = pointerState.ndcX * 1.2;
+    const ty = pointerState.ndcY * 0.8;
+    state.camera.position.x += (tx - state.camera.position.x) * 0.05;
+    state.camera.position.y += (ty - state.camera.position.y) * 0.05;
+    state.camera.lookAt(0, 0, 0);
+  });
+  return null;
 }
 
 export default function Scene() {
@@ -28,7 +41,7 @@ export default function Scene() {
     >
       <Canvas
         camera={{ position: [0, 0, 8], fov: 45 }}
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
       >
         <color attach="background" args={["#06060a"]} />
@@ -46,6 +59,7 @@ export default function Scene() {
           color="#cfcfd6"
         />
 
+        <CameraRig />
         <Particles />
 
         <EffectComposer>

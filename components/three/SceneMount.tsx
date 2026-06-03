@@ -9,9 +9,14 @@
  */
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 
 const Scene = dynamic(() => import("./Scene"), { ssr: false });
 
 export default function SceneMount() {
+  const pathname = usePathname();
+  // The landing page ("/") uses the ShaderGradient backdrop instead of the
+  // butterfly scene. Show the butterflies everywhere else.
+  if (pathname === "/") return null;
   return <Scene />;
 }

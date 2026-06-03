@@ -1,21 +1,17 @@
 "use client";
 
 /**
- * Particles — a drift of fluttering butterflies that gather toward the cursor.
+ * Particles — a resting butterfly swarm, plus bursts that erupt from the cursor.
  *
- * Each butterfly is three InstancedMesh instances sharing an index: a left
- * wing, a right wing, and a slim body — so the whole swarm is just 3 draw
- * calls.
+ * One instanced pool (left wing / right wing / body = 3 draw calls), split:
+ *   - the first AMBIENT_COUNT are always-alive "resting" butterflies that drift
+ *     and wander gently around the screen
+ *   - the rest are a burst pool: dead until the cursor moves, then spawned at
+ *     the cursor with a slow outward radial velocity (a graceful "bomb"),
+ *     scattering off-screen and recycling — with a fade in/out so they don't pop
  *
- * Motion is a light "boids"-style flight model computed on the CPU each frame:
- *   - wander: a smoothly turning steering force, so paths bob and curve
- *   - home pull: a gentle tether to each butterfly's spawn area so the swarm
- *     stays spread out across the screen
- *   - cursor attraction: butterflies steer toward the mouse (and orbit it),
- *     scaled by a per-butterfly affinity and how much the cursor is moving —
- *     so they crowd and trail wherever the cursor goes (see lib/pointerState)
- * The body banks/pitches into its velocity and the wings beat about the body
- * axis with a slightly non-sinusoidal stroke, which reads as real flapping.
+ * Cursor position + movement intensity come from lib/pointerState (the canvas
+ * has pointer-events: none, so we can't use R3F's built-in pointer).
  */
 
 import { useEffect, useMemo, useRef } from "react";
@@ -23,63 +19,75 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { pointerState } from "@/lib/pointerState";
 
-const COUNT = 45;
-const SPREAD = new THREE.Vector3(24, 18, 10); // x / y / z extents
-const MAX_SPEED = 0.55;
-const MIN_SPEED = 0.06;
+const COUNT = 180; // total pool
+const AMBIENT_COUNT = 55; // always-alive resting swarm; rest is the burst pool
 
-type Seed = {
+// resting swarm
+const AMB_MAX_SPEED = 0.5;
+const AMB_THRUST = 2.5;
+const AMB_DRAG = 1.8;
+
+// cursor bursts — slow & graceful
+const SPAWN_RATE = 16; // butterflies/sec at full cursor movement
+const BURST_MIN = 0.6; // gentle outward speed (units/sec)
+const BURST_MAX = 1.9;
+const BURST_DRAG = 0.55;
+// click = one big, slightly faster explosion
+const CLICK_COUNT = 42;
+const CLICK_MIN = 1.2;
+const CLICK_MAX = 3.4;
+const MAX_LIFE = 7; // seconds, then fade out & recycle
+const FADE = 1.2; // fade in/out duration (s)
+const MARGIN = 2.5; // world units past the edge before recycle
+
+type Bug = {
+  ambient: boolean;
   home: THREE.Vector3;
-  wanderFreq: number;
-  wanderPhase: number;
-  flapSpeed: number;
-  flapPhase: number;
-  scale: number;
-  affinity: number; // 0..1 — how strongly this one chases the cursor
-  orbitDir: number; // +1 / -1 — which way it swirls around the cursor
-};
-
-type Mover = {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
+  alive: boolean;
+  age: number;
   yaw: number;
   pitch: number;
   roll: number;
+  wander: number;
+  wanderFreq: number;
+  flapSpeed: number;
+  flapPhase: number;
+  scale: number;
 };
 
-function makeSeeds(): Seed[] {
-  const seeds: Seed[] = [];
-  for (let i = 0; i < COUNT; i++) {
-    seeds.push({
-      home: new THREE.Vector3(
-        (Math.random() - 0.5) * SPREAD.x,
-        (Math.random() - 0.5) * SPREAD.y,
-        (Math.random() - 0.5) * SPREAD.z
-      ),
+function makeBugs(): Bug[] {
+  return Array.from({ length: COUNT }, (_, i) => {
+    const ambient = i < AMBIENT_COUNT;
+    const home = new THREE.Vector3(
+      (Math.random() - 0.5) * 24,
+      (Math.random() - 0.5) * 18,
+      (Math.random() - 0.5) * 10
+    );
+    return {
+      ambient,
+      home,
+      pos: ambient ? home.clone() : new THREE.Vector3(0, 0, -999),
+      vel: ambient
+        ? new THREE.Vector3(
+            (Math.random() - 0.5) * 0.4,
+            (Math.random() - 0.5) * 0.4,
+            (Math.random() - 0.5) * 0.2
+          )
+        : new THREE.Vector3(),
+      alive: ambient,
+      age: 0,
+      yaw: 0,
+      pitch: 0,
+      roll: 0,
+      wander: Math.random() * Math.PI * 2,
       wanderFreq: 0.4 + Math.random() * 0.7,
-      wanderPhase: Math.random() * Math.PI * 2,
-      flapSpeed: 7 + Math.random() * 7, // wing-beats are fast
+      flapSpeed: 7 + Math.random() * 7,
       flapPhase: Math.random() * Math.PI * 2,
       scale: 0.07 + Math.random() * 0.09,
-      affinity: Math.pow(Math.random(), 1.5), // skew toward low — only some chase hard
-      orbitDir: Math.random() < 0.5 ? -1 : 1,
-    });
-  }
-  return seeds;
-}
-
-function makeMovers(seeds: Seed[]): Mover[] {
-  return seeds.map((s) => ({
-    pos: s.home.clone(),
-    vel: new THREE.Vector3(
-      (Math.random() - 0.5) * 1.2,
-      (Math.random() - 0.5) * 1.2,
-      (Math.random() - 0.5) * 0.6
-    ),
-    yaw: 0,
-    pitch: 0,
-    roll: 0,
-  }));
+    };
+  });
 }
 
 /** A single butterfly wing silhouette (fore- + hind-wing) in the XY plane,
@@ -98,13 +106,14 @@ export default function Particles() {
   const leftRef = useRef<THREE.InstancedMesh>(null);
   const rightRef = useRef<THREE.InstancedMesh>(null);
   const bodyRef = useRef<THREE.InstancedMesh>(null);
-  const seeds = useMemo(makeSeeds, []);
-  const movers = useMemo(() => makeMovers(seeds), [seeds]);
+  const bugs = useMemo(makeBugs, []);
+  const spawnAcc = useRef(0);
+  const scanIdx = useRef(AMBIENT_COUNT);
 
   const { wingGeoR, wingGeoL, bodyGeo, wingMat, bodyMat } = useMemo(() => {
     const wingGeoR = new THREE.ShapeGeometry(makeWingShape(), 20);
     const wingGeoL = wingGeoR.clone();
-    wingGeoL.scale(-1, 1, 1); // mirror across the body axis
+    wingGeoL.scale(-1, 1, 1);
     const bodyGeo = new THREE.CylinderGeometry(0.035, 0.02, 0.85, 6);
     const wingMat = new THREE.MeshStandardMaterial({
       color: "#eef0f5",
@@ -113,8 +122,6 @@ export default function Particles() {
       roughness: 0.7,
       metalness: 0.05,
       side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.9,
     });
     const bodyMat = new THREE.MeshStandardMaterial({
       color: "#2a2a30",
@@ -124,14 +131,14 @@ export default function Particles() {
     return { wingGeoR, wingGeoL, bodyGeo, wingMat, bodyMat };
   }, []);
 
-  // Per-instance wing tint — subtle pale variation so they aren't all identical.
+  // Per-instance wing tint — subtle pale variation.
   useEffect(() => {
     const c = new THREE.Color();
     for (const ref of [leftRef.current, rightRef.current]) {
       if (!ref) continue;
       for (let i = 0; i < COUNT; i++) {
         const l = 0.82 + Math.random() * 0.18;
-        const h = 0.55 + (Math.random() - 0.5) * 0.12; // faint cool/warm
+        const h = 0.55 + (Math.random() - 0.5) * 0.12;
         c.setHSL(h, 0.08, l);
         ref.setColorAt(i, c);
       }
@@ -139,11 +146,21 @@ export default function Particles() {
     }
   }, []);
 
-  // Reusable scratch — avoid per-frame allocation.
   const body = useMemo(() => new THREE.Object3D(), []);
   const wing = useMemo(() => new THREE.Object3D(), []);
   const wingMatrix = useMemo(() => new THREE.Matrix4(), []);
   const acc = useMemo(() => new THREE.Vector3(), []);
+
+  const claimSlot = () => {
+    for (let n = 0; n < COUNT - AMBIENT_COUNT; n++) {
+      const i = AMBIENT_COUNT + ((scanIdx.current - AMBIENT_COUNT + n) % (COUNT - AMBIENT_COUNT));
+      if (!bugs[i].alive) {
+        scanIdx.current = i + 1;
+        return i;
+      }
+    }
+    return -1;
+  };
 
   useFrame((state, delta) => {
     const left = leftRef.current;
@@ -152,90 +169,155 @@ export default function Particles() {
     if (!left || !right || !bodyMesh) return;
 
     const t = state.clock.elapsedTime;
-    const dt = Math.min(delta, 0.05); // clamp so tab-switches don't teleport
+    const dt = Math.min(delta, 0.05);
 
-    // Cursor position in world space, on the z=0 plane.
     const halfW = state.viewport.width / 2;
     const halfH = state.viewport.height / 2;
     const cx = pointerState.ndcX * halfW;
     const cy = pointerState.ndcY * halfH;
     const act = pointerState.activity;
-    pointerState.activity = Math.max(0, act - dt * 0.9); // decay toward idle
+    pointerState.activity = Math.max(0, act - dt * 2.2);
 
-    for (let i = 0; i < COUNT; i++) {
-      const s = seeds[i];
-      const m = movers[i];
-      const beat = Math.sin(t * s.flapSpeed + s.flapPhase); // -1..1
-
-      // --- steering forces ---
-      acc.set(0, 0, 0);
-
-      // wander — a slowly curving push, unique per butterfly
-      const wa = s.wanderPhase + t * s.wanderFreq;
-      acc.x += Math.cos(wa) * 1.7;
-      acc.y += Math.sin(wa * 1.3) * 1.3;
-      acc.z += Math.sin(wa * 0.7) * 0.7;
-
-      // home tether — keeps the swarm spread out (z held tighter for depth)
-      acc.x += (s.home.x - m.pos.x) * 0.22;
-      acc.y += (s.home.y - m.pos.y) * 0.22;
-      acc.z += (s.home.z - m.pos.z) * 0.6;
-
-      // cursor attraction + orbit — crowd toward where the mouse moves
-      if (pointerState.engaged) {
-        const dx = cx - m.pos.x;
-        const dy = cy - m.pos.y;
-        const d = Math.hypot(dx, dy) + 0.001;
-        const pull = s.affinity * (0.35 + act * 1.8);
-        acc.x += (dx / d) * pull * 3.2;
-        acc.y += (dy / d) * pull * 3.2;
-        // swirl tangentially, stronger up close, so they circle not collapse
-        const orbit = (s.affinity * 2.4) / (1 + d * 0.5);
-        acc.x += (-dy / d) * orbit * s.orbitDir;
-        acc.y += (dx / d) * orbit * s.orbitDir;
-        // and let chasers drift toward the screen plane
-        acc.z += (0 - m.pos.z) * s.affinity * 0.5;
-      }
-
-      // --- integrate velocity ---
-      m.vel.addScaledVector(acc, dt);
-      let speed = m.vel.length();
-      if (speed > MAX_SPEED) m.vel.multiplyScalar(MAX_SPEED / speed);
-      else if (speed < MIN_SPEED && speed > 0)
-        m.vel.multiplyScalar(MIN_SPEED / speed);
-      speed = m.vel.length();
-      m.pos.addScaledVector(m.vel, dt);
-
-      // --- orient: bank/pitch into the flight direction, smoothed ---
-      const targetRoll = THREE.MathUtils.clamp(-m.vel.x * 0.18, -0.6, 0.6);
-      const targetPitch = THREE.MathUtils.clamp(m.vel.y * 0.16, -0.5, 0.5);
-      const targetYaw = Math.atan2(m.vel.x, Math.abs(m.vel.z) + 2.5) * 0.6;
+    // Write the body + flapping wing matrices for one bug at a given scale.
+    const writeMatrices = (i: number, b: Bug, renderScale: number, beat: number) => {
+      const targetRoll = THREE.MathUtils.clamp(-b.vel.x * 0.18, -0.6, 0.6);
+      const targetPitch = THREE.MathUtils.clamp(b.vel.y * 0.16, -0.5, 0.5);
+      const targetYaw = Math.atan2(b.vel.x, Math.abs(b.vel.z) + 2.5) * 0.6;
       const k = Math.min(1, dt * 4);
-      m.roll += (targetRoll - m.roll) * k;
-      m.pitch += (targetPitch - m.pitch) * k;
-      m.yaw += (targetYaw - m.yaw) * k;
+      b.roll += (targetRoll - b.roll) * k;
+      b.pitch += (targetPitch - b.pitch) * k;
+      b.yaw += (targetYaw - b.yaw) * k;
 
-      // --- body matrix (with a tiny bob synced to the wing-beat) ---
-      body.position.set(m.pos.x, m.pos.y + beat * 0.05, m.pos.z);
-      body.rotation.set(m.pitch, m.yaw, m.roll);
-      body.scale.setScalar(s.scale);
+      body.position.set(b.pos.x, b.pos.y + beat * 0.05, b.pos.z);
+      body.rotation.set(b.pitch, b.yaw, b.roll);
+      body.scale.setScalar(renderScale);
       body.updateMatrix();
       bodyMesh.setMatrixAt(i, body.matrix);
 
-      // --- wings: shaped, symmetric flap about the body axis ---
-      const stroke = beat * 0.85 + Math.sin(2 * (t * s.flapSpeed + s.flapPhase)) * 0.13;
-      const ang = THREE.MathUtils.clamp(stroke, -0.95, 0.95);
-
+      const wave = beat * 0.5 + 0.5;
+      const ang = 0.1 + wave * 1.05;
       wing.position.set(0, 0, 0);
       wing.rotation.set(0, -ang, 0);
       wing.updateMatrix();
       wingMatrix.multiplyMatrices(body.matrix, wing.matrix);
       right.setMatrixAt(i, wingMatrix);
-
       wing.rotation.set(0, ang, 0);
       wing.updateMatrix();
       wingMatrix.multiplyMatrices(body.matrix, wing.matrix);
       left.setMatrixAt(i, wingMatrix);
+    };
+
+    const hide = (i: number) => {
+      body.scale.setScalar(0);
+      body.position.set(0, 0, -999);
+      body.rotation.set(0, 0, 0);
+      body.updateMatrix();
+      bodyMesh.setMatrixAt(i, body.matrix);
+      left.setMatrixAt(i, body.matrix);
+      right.setMatrixAt(i, body.matrix);
+    };
+
+    // Spawn one burst butterfly at a world point with an outward radial velocity.
+    const spawnAt = (wx: number, wy: number, sMin: number, sMax: number) => {
+      const i = claimSlot();
+      if (i < 0) return false;
+      const b = bugs[i];
+      const ang = Math.random() * Math.PI * 2;
+      const sp = sMin + Math.random() * (sMax - sMin);
+      b.pos.set(
+        wx + (Math.random() - 0.5) * 0.4,
+        wy + (Math.random() - 0.5) * 0.4,
+        (Math.random() - 0.5) * 1.5
+      );
+      b.vel.set(Math.cos(ang) * sp, Math.sin(ang) * sp, (Math.random() - 0.5) * 0.4);
+      b.alive = true;
+      b.age = 0;
+      b.wander = Math.random() * Math.PI * 2;
+      b.wanderFreq = 0.4 + Math.random() * 0.7;
+      b.flapSpeed = 9 + Math.random() * 7;
+      b.flapPhase = Math.random() * Math.PI * 2;
+      b.scale = 0.07 + Math.random() * 0.09;
+      b.yaw = b.pitch = b.roll = 0;
+      return true;
+    };
+
+    // --- click: one big explosion at the click point ---
+    if (pointerState.clickPending) {
+      pointerState.clickPending = false;
+      const wx = pointerState.clickX * halfW;
+      const wy = pointerState.clickY * halfH;
+      for (let n = 0; n < CLICK_COUNT; n++) {
+        if (!spawnAt(wx, wy, CLICK_MIN, CLICK_MAX)) break;
+      }
+    }
+
+    // --- movement: a steady trickle from the cursor while it moves ---
+    if (pointerState.engaged && act > 0.02) {
+      spawnAcc.current += act * SPAWN_RATE * dt;
+      let toSpawn = Math.floor(spawnAcc.current);
+      spawnAcc.current -= toSpawn;
+      while (toSpawn-- > 0) {
+        if (!spawnAt(cx, cy, BURST_MIN, BURST_MAX)) break;
+      }
+    } else {
+      spawnAcc.current = 0;
+    }
+
+    for (let i = 0; i < COUNT; i++) {
+      const b = bugs[i];
+      const beat = Math.sin(t * b.flapSpeed + b.flapPhase);
+
+      if (b.ambient) {
+        // resting swarm — wander + gentle home tether, flap-driven thrust
+        acc.set(0, 0, 0);
+        const wa = b.wander + t * b.wanderFreq;
+        acc.x += Math.cos(wa) * 1.7;
+        acc.y += Math.sin(wa * 1.3) * 1.3;
+        acc.z += Math.sin(wa * 0.7) * 0.7;
+        acc.x += (b.home.x - b.pos.x) * 0.22;
+        acc.y += (b.home.y - b.pos.y) * 0.22;
+        acc.z += (b.home.z - b.pos.z) * 0.6;
+        const pulse = Math.pow(Math.max(0, beat), 1.6);
+        const dlen = acc.length();
+        if (dlen > 1e-4) {
+          acc.multiplyScalar(1 / dlen);
+          b.vel.addScaledVector(acc, pulse * AMB_THRUST * dt);
+        }
+        b.vel.multiplyScalar(Math.exp(-AMB_DRAG * dt));
+        const speed = b.vel.length();
+        if (speed > AMB_MAX_SPEED) b.vel.multiplyScalar(AMB_MAX_SPEED / speed);
+        b.pos.addScaledVector(b.vel, dt);
+        writeMatrices(i, b, b.scale, beat);
+        continue;
+      }
+
+      // burst pool
+      if (!b.alive) {
+        hide(i);
+        continue;
+      }
+
+      b.age += dt;
+      const wa = b.wander + t * 1.1;
+      b.vel.x += Math.cos(wa) * 0.4 * dt;
+      b.vel.y += Math.sin(wa * 1.2) * 0.4 * dt;
+      b.vel.multiplyScalar(Math.exp(-BURST_DRAG * dt));
+      b.pos.addScaledVector(b.vel, dt);
+
+      if (
+        b.age > MAX_LIFE ||
+        Math.abs(b.pos.x) > halfW + MARGIN ||
+        Math.abs(b.pos.y) > halfH + MARGIN
+      ) {
+        b.alive = false;
+        hide(i);
+        continue;
+      }
+
+      // fade in on spawn, fade out near end of life — no popping
+      const fadeIn = THREE.MathUtils.clamp(b.age / FADE, 0, 1);
+      const fadeOut = THREE.MathUtils.clamp((MAX_LIFE - b.age) / FADE, 0, 1);
+      writeMatrices(i, b, b.scale * Math.min(fadeIn, fadeOut), beat);
     }
 
     left.instanceMatrix.needsUpdate = true;
@@ -245,21 +327,9 @@ export default function Particles() {
 
   return (
     <group>
-      <instancedMesh
-        ref={leftRef}
-        args={[wingGeoL, wingMat, COUNT]}
-        frustumCulled={false}
-      />
-      <instancedMesh
-        ref={rightRef}
-        args={[wingGeoR, wingMat, COUNT]}
-        frustumCulled={false}
-      />
-      <instancedMesh
-        ref={bodyRef}
-        args={[bodyGeo, bodyMat, COUNT]}
-        frustumCulled={false}
-      />
+      <instancedMesh ref={leftRef} args={[wingGeoL, wingMat, COUNT]} frustumCulled={false} />
+      <instancedMesh ref={rightRef} args={[wingGeoR, wingMat, COUNT]} frustumCulled={false} />
+      <instancedMesh ref={bodyRef} args={[bodyGeo, bodyMat, COUNT]} frustumCulled={false} />
     </group>
   );
 }
