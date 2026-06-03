@@ -4,6 +4,7 @@ import { useState } from "react";
 import Nav from "@/components/Nav";
 import Hero from "@/components/Hero";
 import ProjectGrid from "@/components/ProjectGrid";
+import GlowCTA from "@/components/GlowCTA";
 import type { Filter } from "@/lib/projects";
 
 export default function Projects() {
@@ -15,12 +16,9 @@ export default function Projects() {
       <main>
         <Hero active={filter} onChange={setFilter} />
         <ProjectGrid filter={filter} />
-        <footer
-          id="contact"
-          className="border-t border-white/5 py-12 text-center text-sm text-[var(--color-bone-dim)]"
-        >
-          <p>Placeholder footer — contact@example.com</p>
-          <p className="mt-2 opacity-60">© {new Date().getFullYear()}</p>
+        <GlowCTA />
+        <footer className="py-8 text-center text-xs text-[var(--color-bone-dim)] opacity-60">
+          © {new Date().getFullYear()} Rawitphoom Kiatthitinan
         </footer>
       </main>
     </>
