@@ -332,13 +332,13 @@ export default function PixelLab() {
         </Reveal>
         <Reveal delay={0.08}>
           <div className="mt-10 aspect-video w-full overflow-hidden rounded-xl border border-white/10 bg-black">
-            <iframe
+            <video
               className="h-full w-full"
-              src="https://www.youtube.com/embed/TH-owmpUB2U"
-              title="Pixel Lab — demo"
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
+              src="/projects/pixel-lab/demo.mp4"
+              poster="/projects/pixel-lab/cover.png"
+              controls
+              playsInline
+              preload="metadata"
             />
           </div>
         </Reveal>
