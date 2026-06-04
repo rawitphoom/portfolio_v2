@@ -3,6 +3,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { PROJECTS } from "@/lib/projects";
 import Nav from "@/components/Nav";
+import PixelLab from "@/components/case/PixelLab";
+
+// Slugs that have a bespoke, fully built case-study page.
+const CUSTOM_CASES: Record<string, React.ComponentType> = {
+  "pixel-lab": PixelLab,
+};
 
 type Params = { slug: string };
 
@@ -30,6 +36,16 @@ export default async function ProjectPage({
   const { slug } = await params;
   const project = PROJECTS.find((p) => p.slug === slug);
   if (!project) notFound();
+
+  const Custom = CUSTOM_CASES[slug];
+  if (Custom) {
+    return (
+      <>
+        <Nav />
+        <Custom />
+      </>
+    );
+  }
 
   return (
     <>
