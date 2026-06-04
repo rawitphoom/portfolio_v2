@@ -60,6 +60,14 @@ export const PROJECTS: Project[] = [
     tags: ["Motion"],
     cover: "/projects/small-but-mighty/cover.png",
   },
+  {
+    slug: "pixel-lab",
+    title: "Pixel Lab",
+    subtitle: "AI-Evolved Game Assets",
+    course: "IAT460 — Computational Arts",
+    tags: ["Digital", "Experiment"],
+    cover: "/projects/pixel-lab/cover.png",
+  },
 ];
 
 export const FILTERS = ["All", "Branding", "Digital", "Motion", "Experiment"] as const;

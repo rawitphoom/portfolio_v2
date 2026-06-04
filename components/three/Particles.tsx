@@ -19,8 +19,8 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { pointerState } from "@/lib/pointerState";
 
-const COUNT = 180; // total pool
-const AMBIENT_COUNT = 55; // always-alive resting swarm; rest is the burst pool
+const COUNT = 130; // total pool
+const AMBIENT_COUNT = 45; // always-alive resting swarm; rest is the burst pool
 
 // resting swarm
 const AMB_MAX_SPEED = 0.5;
